@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Перевірка присутності</title>
+  <style>
+    :root {
+      --primary-color: #007bff;
+      --primary-hover: #0056b3;
+      --primary-active: #004095;
+      --font-size-base: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 1rem;
+      font-size: var(--font-size-base);
+      line-height: 1.6;
+      background-color: #f4f4f4;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+    }
+
+    .student-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .student label {
+      display: flex;
+      align-items: center;
+      background: #fff;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .student input[type="checkbox"] {
+      transform: scale(1.3);
+      margin-right: 0.75rem;
+    }
+
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      background-color: var(--primary-color);
+      color: white;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: all 0.2s ease-in-out;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transform: scale(1);
+    }
+
+    button:hover {
+      background-color: var(--primary-hover);
+      transform: scale(1.03);
+    }
+
+    button:active {
+      background-color: var(--primary-active);
+      transform: scale(0.97);
+    }
+
+    #okButton, #reasonButton, #reportButton {
+      display: none;
+    }
+
+    #absentOutput {
+      white-space: pre-wrap;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #ffffff;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    #counter {
+      margin-top: 0.5rem;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    select {
+      margin-left: 0.5rem;
+      font-size: 1rem;
+      padding: 0.25rem;
+    }
+
+    #copyTextArea {
+      position: absolute;
+      left: -9999px;
+    }
+
+    @media (min-width: 600px) {
+      .student-list {
+        max-width: 600px;
+        margin: 0 auto 1rem;
+      }
+
+      button {
+        max-width: 400px;
+        margin: 0.5rem auto;
+        display: block;
+      }
+
+      #absentOutput {
+        max-width: 600px;
+        margin: 1rem auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Перевірка присутності</h1>
+  <div class="student-list" id="studentList"></div>
+  <button id="okButton" onclick="handleFirstOK()">OK</button>
+  <div id="counter"></div>
+  <div id="absentOutput"></div>
+  <textarea id="copyTextArea" readonly></textarea>
+  <button id="reasonButton" onclick="generateFinalList()">OK (з причинами)</button>
+  <button id="reportButton" onclick="goToReport()">Перейти до звіту</button>
+
+  <script>
+    const students = [
+      "Білей М.Д.",
+      "Бондарець М.Р.",
+      "Гаркуша Р.С.",
+      "Демченко В.А.",
+      "Євстратенко І.В.",
+      "Зайченко Я.П.",
+      "Кирпа Г.С.",
+      "Клименко С.О.",
+      "Колесов М.В.",
+      "Колісніченко І.Б.",
+      "Кривенко М.О.",
+      "Ледньов Є.О.",
+      "Масалова В.М.",
+      "Мурзін Т.Б.",
+      "Нетудихата Б.С.",
+      "Письменний Т.Р.",
+      "Піньковський А.Р.",
+      "Самарець І.Д.",
+      "Сидоренко О.С.",
+      "Скляренко Р.І.",
+      "Ткаченко В.М.",
+      "Третяк Г.П.",
+      "Шеремет Д.С.",
+      "Шкуренко П.К.",
+      "Шульга О.Г."
+    ];
+
+    const reasons = [
+      "сімейні обставини",
+      "захворів",
+      "без поважної причини",
+      "хворіє",
+      "пішов до лікаря",
+      "захищає честь коледжу у конкурсі",
+      "технічні проблеми",
+      "погане самопочуття",
+      "немає інтернету",
+      "відсторонений",
+      "за кордоном",
+      "запізнився",
+      "здав",
+      "не здав",
+      "був але займався своїми справами"
+    ];
+
+    // Новий список студентів, для яких причина "за кордоном" ставиться автоматично
+    const abroadStudents = new Set([
+      "Євстратенко І.В.",
+      "Колісніченко І.Б.",
+      "Піньковський А.Р.",
+      "Шульга О.Г."
+    ]);
+
+    const listContainer = document.getElementById('studentList');
+    const okButton = document.getElementById('okButton');
+    const reasonButton = document.getElementById('reasonButton');
+    const reportButton = document.getElementById('reportButton');
+    const counter = document.getElementById('counter');
+    const textArea = document.getElementById('copyTextArea');
+
+    students.forEach((name, index) => {
+      const div = document.createElement('div');
+      div.classList.add('student');
+      div.innerHTML = `<label><input type="checkbox" id="student${index}" onchange="toggleOKButton()"> ${name}</label>`;
+      listContainer.appendChild(div);
+    });
+
+    function toggleOKButton() {
+      const absentCount = students.filter((_, index) => !document.getElementById(`student${index}`).checked).length;
+      okButton.style.display = absentCount > 0 ? 'block' : 'none';
+    }
+
+    function handleFirstOK() {
+      const absentOutput = document.getElementById('absentOutput');
+      absentOutput.innerHTML = '';
+
+      let absentCount = 0;
+      students.forEach((name, index) => {
+        if (!document.getElementById(`student${index}`).checked) {
+          absentCount++;
+          const select = document.createElement('select');
+          select.id = `reason${index}`;
+
+          // Перевіряємо, чи є студент у списку "за кордоном"
+          const isAbroad = abroadStudents.has(name);
+
+          const defaultOption = document.createElement('option');
+          defaultOption.textContent = '...';
+          defaultOption.disabled = false;
+          defaultOption.value = "";
+          // Обираємо '...' за замовчуванням, ТІЛЬКИ ЯКЩО студент НЕ у списку
+          defaultOption.selected = !isAbroad;
+          select.appendChild(defaultOption);
+
+          reasons.forEach(reason => {
+            const option = document.createElement('option');
+            option.value = reason;
+            option.textContent = reason;
+            // Якщо студент у списку і причина "за кордоном", обираємо її
+            if (isAbroad && reason === "за кордоном") {
+              option.selected = true;
+            }
+            select.appendChild(option);
+          });
+
+          const line = document.createElement('div');
+          line.textContent = name;
+          line.appendChild(select);
+          absentOutput.appendChild(line);
+        }
+      });
+
+      counter.textContent = `Відсутні: ${absentCount} з ${students.length}`;
+      reasonButton.style.display = 'block';
+      absentOutput.scrollIntoView({ behavior: "smooth" });
+    }
+
+    function generateFinalList() {
+      const lines = [];
+      students.forEach((name, index) => {
+        if (!document.getElementById(`student${index}`).checked) {
+          const reasonSelect = document.getElementById(`reason${index}`);
+          let reasonValue = reasonSelect && reasonSelect.value ? reasonSelect.value : "";
+          
+          let reason;
+          if (reasonValue) {
+            // Якщо причина обрана (не '...'), беремо її
+            reason = reasonValue;
+          } else {
+            // Якщо причина не обрана ('...'), перевіряємо список
+            if (abroadStudents.has(name)) {
+              reason = "за кордоном"; // Автоматична причина для цієї групи
+            } else {
+              reason = "немає інтернету"; // Стандартна причина для інших
+            }
+          }
+          
+          lines.push(`${name} (${reason})`);
+        }
+      });
+      let listBody = lines.map((line, idx) => idx === lines.length - 1 ? line + '.' : line + ';').join("\n");
+      const resultText = lines.length > 0 ? `Відсутні:\n${listBody}` : "Всі присутні.";
+      document.getElementById('absentOutput').textContent = resultText;
+
+      textArea.value = listBody;
+      textArea.select();
+      try {
+        const successful = document.execCommand('copy');
+        alert(successful ? "Список скопійовано до буфера обміну!" : "Не вдалося скопіювати.");
+        reasonButton.style.display = 'none';
+        reportButton.style.display = 'block';
+      } catch (err) {
+        alert("Помилка при копіюванні");
+      }
+    }
+
+    function goToReport() {
+      window.open("https://docs.google.com/forms/d/e/1FAIpQLSewGvRM4qcyDnPhsysO8Upa5nujHcizWCRCpifB9XAmf3LWrQ/viewform", "_blank");
+    }
+  </script>
+</body>
+</html>
